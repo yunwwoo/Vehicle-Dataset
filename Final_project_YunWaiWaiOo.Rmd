@@ -1,0 +1,291 @@
+---
+title: "Vehicle_Datset"
+author: "Yun Wai Wai Oo / Melody"
+date: "11/30/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+library(tidyverse)
+car_data<-read.csv("Car details v3.csv")
+car_data
+```
+I find this car dataset interesting because as a college student, I cannot
+afford brand-new cars. So I want to research how mileage, engine, km_driven, 
+types of fuel, and other factors of a used cars associate with the 
+selling_price
+
+I will remove torque from this dataset because I don't get what torque is
+```{r}
+car_data<-subset(car_data, select=-c(torque))
+str(car_data)
+```
+
+So, my aim is to predict selling_price as a linear regression of other variables 
+The name feature should be converted to another feature, car_brands to know 
+the types of car brands we have in this data
+
+As the linear regression between string and integer is not accurate, I converted mileage, engine, max_power to integer
+I will convert mileage into integer and rename it to mileage_kmpl
+```{r}
+car_data$mileage<-str_sub(car_data$mileage,1,nchar(car_data$mileage)-5)
+car_data$mileage<-as.numeric(car_data$mileage)
+car_data<-rename(car_data,mileage_kmpl=mileage)
+```
+I will convert engine to integer and rename it to engine_CC
+```{r}
+car_data$engine<-str_sub(car_data$engine,1,nchar(car_data$engine)-3)
+car_data$engine<-as.numeric(car_data$engine)
+car_data<-rename(car_data,engine_CC=engine)
+```
+I will convert max_power to integer and rename it to max_power_bhp
+```{r}
+car_data$max_power<-str_sub(car_data$max_power,1,nchar(car_data$max_power)-4)
+car_data$max_power<-as.numeric(car_data$max_power)
+car_data<-rename(car_data,max_power_bhp=max_power)
+```
+
+I will look the age of the car so that we can see how old the car is.
+I converted the from year to age so that it is more visible how old the cars in this dataset are
+I will replace 'year' with 'age'
+```{r}
+car_data$year<-2021 - car_data$year
+car_data<-rename(car_data,age=year)
+mean_car_age<-mean(car_data$age,na.rm = TRUE)
+mean_car_age
+```
+The mean car_age in this data is 7.195989 so we will consider cars' ages that are greater than 7.195989 as older model, 7.195989 as average model year and smaller than 2013 as new model
+```{r}
+car_model_version<-car_data%>%
+  mutate(car_model_status=case_when((age<mean(age,na.rm = TRUE))~"old model year",
+                                    (age==mean(age,na.rm = TRUE))~"avg model year",
+                                    (age>mean(age,na.rm = TRUE))~"new model year"))
+car_model_version
+
+```
+
+selling_price vs age
+
+The equation will be 
+selling_price=-787800 -787800  * age
+As the age of the car gets older by 1 unit, the selling_price will decrease by 82553 units
+so we will check the correlation of selling_price and age.
+Let's see the correlation between selling_price and age
+```{r}
+cor(car_data$selling_price,car_data$age)
+```
+The correlation -0.4140919 shows that there is a moderate negative association between selling_price and age. This is relatable to real life too as the car gets older, the selling_price gets lower.
+But the correlation is not so strong since it depends on other features like the type of cars, seats and brands.
+
+```{r}
+age_vs_price<-car_data%>%
+  ggplot(aes(x=age,y=selling_price))+
+  geom_point()+
+  scale_y_continuous(trans="log10")
+age_vs_price
+```
+We have to check the p values: Pr(>|t|). The ones with stars play a significant role in predicting Sales. The more stars we see the more significant they are.We will ignore to look at the Intercept
+
+```{r}
+linear_model1<-lm(selling_price~engine_CC+mileage_kmpl+km_driven+max_power_bhp+age,car_data)
+summary(linear_model1)
+
+```
+The equation will be:
+selling_price=-787800 -0.2066 *engine_CC + 14370 * mileage_kmpl + -1.515* km_driven+ 16660 * max_power_bhp -37410* age
+
+Here there are 3 stars in engine_CC, mileage_kmpl,km_driven, max_power_bhp, age, so it means all these correlates to selling_price 
+Multiple R-squared:0.6366 is a bit far from 1, which
+mean the linear regression does not really explain the dataset well so we will see the correlation 
+correlation of selling_price and max_power but it is moderately well explained dataset
+```{r}
+cor(car_data$selling_price,car_data$max_power_bhp,use = "complete.obs") 
+```
+cor=0.7496738 tells us that there is moderate positive linear association in selling_price and max_power. So I can tell that the selling price of cars is moderately rated to max_power of car selling_price=-787800 + 16660 * max_power_bhp
+This shows that one unit increase in max_power_bhp will result in increase in 16660 units in selling_price.
+Now I will graph a scatter plot to show the linear model of max_power and 
+selling_price
+```{r}
+max_power_vs_price<-car_data%>%
+  ggplot(aes(x=max_power_bhp,y=selling_price,alpha=1.5))+
+  geom_point()+
+  ggtitle("Selling_price vs Max_power")+
+  ylab("Selling_price $")+
+  xlab("Max_power in bhp")+
+  scale_x_continuous(trans="log10")
+max_power_vs_price
+
+
+```
+
+selling_price vs mileage_kmpl
+
+selling_price=-787800 - 14370*mileage_kmpl
+This shows that one unit increase in mileage_kmpl will result in decrease in 14370 units in selling_price.
+```{r}
+cor(car_data$selling_price,car_data$mileage_kmpl,use = "complete.obs") 
+```
+use = "complete.obs" ignore the NAs when looking at correlation
+cor= -0.1260535 tells us there is a negative weak linear association
+Now I will graph a scatter plot to show the linear model of mileage_kmpl and selling_price
+```{r}
+mileage_kmpl_vs_price<-car_data%>%
+  ggplot(aes(x=mileage_kmpl,y=selling_price,alpha=1.5))+
+  geom_point()+
+  geom_abline(intercept = -787800.45,slope=-14370,col="yellow")+
+  ggtitle("mileage vs selling_price")+
+  xlab("mileage in kmpl")+
+  ylab("selling_price in $")+
+  scale_y_continuous(trans="log10")
+mileage_kmpl_vs_price
+```
+
+
+selling_price vs engine_CC
+The equation of selling_price and engine_CC will be:
+selling_price=-787800 - 0.2066*engine_CC
+This shows that one unit increase in engine_CC will result in decrease in 
+0.2066 units in selling_price.
+Let's find correlation between selling_price and engine_CC
+```{r} 
+cor(car_data$selling_price,car_data$engine_CC,use = "complete.obs")
+```
+cor= 0.4557343 this tells us that there is weak to moderate linear association 
+Now I will graph a scatter plot to show the linear model of engine_CC and 
+selling_price
+```{r}
+engine_CC_vs_selling_price<-car_data%>%
+  ggplot(aes(x=engine_CC,y=selling_price,alpha=1.5))+
+  geom_point()+
+  ggtitle("engine vs selling_price")+
+  geom_abline(intercept=-787800,slope=-0.2066)+
+  xlab("engine in CC")+
+  ylab("selling_price in $")
+
+engine_CC_vs_selling_price
+
+```
+
+```{r}
+linear_model_price_km_driven<-lm(selling_price~engine_CC+mileage_kmpl+I(km_driven^2)+I(km_driven^3)+I(km_driven^4)+I(km_driven^5)+max_power_bhp+age,car_data)
+summary(linear_model_price_km_driven)
+```
+
+Here there are 3 stars in all features except for engine_CC, which means after doing non_linearity,
+the engine_CC feature is not associated with selling_price 
+and the Multiple R-squared jumped from 0.6366 to 0.6385, which means the linear model is explained a bit better than before.
+
+selling_price vs km_driven
+
+The equation of selling_price and km_driven will be:
+selling_price= -787800 -1.515  * km_driven
+This shows that one unit increase in km_driven will result in decrease in 
+1.515 units in selling_price.
+Let's check out the correlation of selling_price and km_driven
+```{r}
+cor(car_data$selling_price,car_data$km_driven,use = "complete.obs")
+```
+cor= -0.2255338 this tells us that there is weak to moderate negative linear association 
+Now I will graph a scatter plot to show the linear model of km_driven and 
+selling_price
+```{r}
+km_driven_vs_price<-car_data%>%
+  ggplot(aes(x=km_driven,y=selling_price,alpha=10))+
+  geom_point()+
+  geom_abline(intercept = -787800, slope=-1.515 ,col="green")+
+  ggtitle("km_driven vs selling_price")+
+  xlab("km_driven in km")+
+  ylab("selling_price in $")+
+  scale_x_continuous(trans="log10")+
+  scale_y_continuous(trans="log10")
+km_driven_vs_price
+```
+
+I also want to see numbers of first owner, second owner and third owner cars are in this data
+```{r}
+first_owner_num<-car_data%>%
+  filter(owner=="First Owner")%>%
+  nrow()
+first_owner_num
+```
+5289 are first owner cars
+```{r}
+second_owner_num<-car_data%>%
+  filter(owner=="Second Owner")%>%
+  nrow()
+second_owner_num  
+```
+2105 are second owner cars
+```{r}
+third_owner_num<-car_data%>%
+  filter(owner=="Third Owner")%>%
+  nrow()
+third_owner_num  
+```
+555 are third owner cars
+There are 179 with fourth or above owners
+
+I drew a boxplot with seller_type vs selling_price with a filling of owner
+```{r}
+seller_type_owner_price_boxplot<-car_data%>%
+  ggplot(aes(x=as.factor(seller_type),y=selling_price,fill=as.factor(owner)))+
+  geom_boxplot()
+  
+seller_type_owner_price_boxplot
+```
+We can see that there are many outliers
+
+I drew a boxplot with fuel vs selling_price with a filling of transmission
+```{r}
+fuel_seat_price_boxplot<-car_data%>%
+  ggplot(aes(x=as.factor(fuel),y=selling_price,fill=as.factor(seats)))+
+  geom_boxplot()
+  
+fuel_seat_price_boxplot
+```
+We can see that there are many outliers but as there are different types of car in this dataset, the prices can vary 
+
+
+I will find the mean of max_power in this dataset and classify into low bhp,avg bhp and high bhp
+```{r}
+mean_power<-mean(car_data$max_power_bhp,na.rm=TRUE)
+max_power_category_added<-car_data%>%
+  mutate(max_power_category=
+           case_when(max_power_bhp<mean_power~'below average bhp',
+                     max_power_bhp==mean_power~'average bhp',
+                     max_power_bhp>mean_power~'above average bhp'))
+```
+As I want to look for car for myself, I want to filter out cars with less than 5 seats and car with average bhp.
+As San Francisco is a hilly city, driving with low bhp will have difficulty driving
+Cars with high bhp will result in high fuel consumption 
+So I am also curious about the type of fuel for each car
+I also think that cars greater than third owner will be too old to buy a car so I want first owner or second owner cars.I also want to see what type of transmission is for each car.
+```{r}
+seats_max_power_filtered<-car_data%>%
+  filter((seats<5) & (max_power_bhp<=mean_power)&(owner=="First Owner")| (owner=="Second Owner") &(transmission=="automatic"))%>%
+  group_by(fuel,transmission)
+transmission_filtered<-seats_max_power_filtered%>%
+  filter(transmission=="Automatic")
+transmission_filtered
+```
+
+The challenges I faced with this dataset is that
+most of the variables are in character so I had to convert them into integer. 
+Also I don't understand much about 'torque' variable and it was hard to convert it to integer, so I removed the torque variable.
+I was also trying to have a new column to show the car brands. I first select the first words in 'name' with grep and remove the duplicates with !duplicated(). I got it until then. But when I use mutate to add a new column, there was an error. I try researching about it but I couldn't make it.
+But I will continue doing it.
+
+
+
